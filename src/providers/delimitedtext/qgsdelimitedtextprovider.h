@@ -153,8 +153,13 @@ class QgsDelimitedTextProvider : public QgsVectorDataProvider
      * provider supports setting of subset strings
 
      */
-    virtual bool supportsSubsetString() { return true; }
+    virtual SubsetStringType subsetStringType() { return ExpressionSubsetString; }
 
+    /**
+     * provider supports setting of subset strings
+
+     */
+    virtual bool supportsSubsetString() { return true; }
     /**
      * Returns the subset definition string (typically sql) currently in
      * use by the layer and used by the provider to limit the feature set.

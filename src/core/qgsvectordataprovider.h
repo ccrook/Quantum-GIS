@@ -88,6 +88,20 @@ class CORE_EXPORT QgsVectorDataProvider : public QgsDataProvider
       SelectEncoding =               1 << 13,
     };
 
+    /**
+     * enumeration defining the type of substring used by the provider, used to
+     * choose the ui for editing.
+     */
+    enum SubStringType
+    {
+      /** No substring support */
+      NoSubString = 0,
+      /** substring is an SQL expression */
+      SqlSubString = 1,
+      /** substring is a QgsExpression string */
+      ExpressionSubString = 2,
+    };
+
     /** bitmask of all provider's editing capabilities */
     const static int EditingCapabilities = AddFeatures | DeleteFeatures |
                                            ChangeAttributeValues | ChangeGeometries | AddAttributes | DeleteAttributes;

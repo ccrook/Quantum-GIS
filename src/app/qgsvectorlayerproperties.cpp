@@ -28,6 +28,7 @@
 #include "qgscoordinatetransform.h"
 #include "qgsdiagramproperties.h"
 #include "qgsdiagramrendererv2.h"
+#include "qgsexpressionbuilderdialog.h"
 #include "qgsfieldcalculator.h"
 #include "qgsfieldsproperties.h"
 #include "qgslabeldialog.h"
@@ -458,25 +459,52 @@ void QgsVectorLayerProperties::apply()
 
 void QgsVectorLayerProperties::on_pbnQueryBuilder_clicked()
 {
-  // launch the query builder
-  QgsQueryBuilder *qb = new QgsQueryBuilder( layer, this );
+  QgsVectorDataProvider* pr = layer->dataProvider();
+  QgsDataProvider::SubsetStringType stringType = pr->subsetStringType();
 
-  // Set the sql in the query builder to the same in the prop dialog
-  // (in case the user has already changed it)
-  qb->setSql( txtSubsetSQL->toPlainText() );
-  // Open the query builder
-  if ( qb->exec() )
+  if( stringType== QgsDataProvider::ExpressionSubsetString )
   {
-    // if the sql is changed, update it in the prop subset text box
-    txtSubsetSQL->setText( qb->sql() );
-    //TODO If the sql is changed in the prop dialog, the layer extent should be recalculated
+    // launch the  builder
+    QgsExpressionBuilderDialog *qb = new QgsExpressionBuilderDialog( layer, txtSubsetSQL->toPlainText(), this );
 
-    // The datasource for the layer needs to be updated with the new sql since this gets
-    // saved to the project file. This should happen at the map layer level...
+    // Open the expression builder
+    if ( qb->exec() )
+    {
+      // if the sql is changed, update it in the prop subset text boxexpression
+      txtSubsetSQL->setText( qb->expressionText() );
+      //TODO If the sql is changed in the prop dialog, the layer extent should be recalculated
+
+      // The datasource for the layer needs to be updated with the new sql since this gets
+      // saved to the project file. This should happen at the map layer level...
+
+    }
+    // delete the expression builder object
+    delete qb;
+
 
   }
-  // delete the query builder object
-  delete qb;
+  else
+  {
+    // launch the query builder
+    QgsQueryBuilder *qb = new QgsQueryBuilder( layer, this );
+
+    // Set the sql in the query builder to the same in the prop dialog
+    // (in case the user has already changed it)
+    qb->setSql( txtSubsetSQL->toPlainText() );
+    // Open the query builder
+    if ( qb->exec() )
+    {
+      // if the sql is changed, update it in the prop subset text box
+      txtSubsetSQL->setText( qb->sql() );
+      //TODO If the sql is changed in the prop dialog, the layer extent should be recalculated
+
+      // The datasource for the layer needs to be updated with the new sql since this gets
+      // saved to the project file. This should happen at the map layer level...
+
+    }
+    // delete the query builder object
+    delete qb;
+  }
 }
 
 void QgsVectorLayerProperties::on_pbnIndex_clicked()

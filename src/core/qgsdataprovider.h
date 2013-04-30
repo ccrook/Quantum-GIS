@@ -58,6 +58,22 @@ class CORE_EXPORT QgsDataProvider : public QObject
       Net                 = 1 << 3  // Internet source
     };
 
+    /**
+     * enumeration defining the type of substring used by the provider, used to
+     * choose the ui for editing.
+     */
+    enum SubsetStringType
+    {
+      /** No substring support */
+      NoSubsetString = 0,
+      /** Default substring type - for backwards compatibility  */
+      DefaultSubsetString = 1,
+      /** substring is an SQL expression */
+      SqlSubsetString = 2,
+      /** substring is a QgsExpression string */
+      ExpressionSubsetString = 3,
+    };
+
     QgsDataProvider( QString const & uri = "" )
         : mDataSourceURI( uri )
     {}
@@ -140,6 +156,12 @@ class CORE_EXPORT QgsDataProvider : public QObject
      * @note added in 1.4
      */
     virtual bool supportsSubsetString() { return false; }
+
+    /**
+     * Define the type of subset string used
+     * @note added in 2.0
+     */
+    virtual SubsetStringType subsetStringType() { return supportsSubsetString() ? DefaultSubsetString : NoSubsetString; }
 
     /**
      * Returns the subset definition string (typically sql) currently in
