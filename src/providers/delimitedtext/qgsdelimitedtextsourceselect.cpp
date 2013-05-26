@@ -35,6 +35,7 @@ const int MAX_SAMPLE_LENGTH = 200;
 
 QgsDelimitedTextSourceSelect::QgsDelimitedTextSourceSelect( QWidget * parent, Qt::WFlags fl, bool embedded ):
     QDialog( parent, fl ),
+    mPreviewFileName(),
     mFile( new QgsDelimitedTextFile() ),
     mExampleRowCount( 20 ),
     mBadRowCount( 0 ),
@@ -110,7 +111,7 @@ QgsDelimitedTextSourceSelect::~QgsDelimitedTextSourceSelect()
 
 void QgsDelimitedTextSourceSelect::on_btnBrowseForFile_clicked()
 {
-  getOpenFileName();
+  getOpenFileNames();
 }
 
 void QgsDelimitedTextSourceSelect::on_buttonBox_accepted()
@@ -149,56 +150,66 @@ void QgsDelimitedTextSourceSelect::on_buttonBox_accepted()
 
   //Build the delimited text URI from the user provided information
 
-  QUrl url = mFile->url();
+  QStringList filenames = selectedFileNames();
 
-  if ( cbxPointIsComma->isChecked() )
+  for ( int i = 0; i < filenames.size(); i++ )
   {
-    url.addQueryItem( "decimalPoint", "," );
-  }
-  if ( cbxXyDms->isChecked() )
-  {
-    url.addQueryItem( "xyDms", "yes" );
-  }
+    QString filename = filenames[i];
+    QFileInfo finfo(filename);
+    if ( ! finfo.exists() ) continue;
+    mFile->setFileName( filename );
 
-  if ( geomTypeXY->isChecked() )
-  {
-    if ( !cmbXField->currentText().isEmpty() && !cmbYField->currentText().isEmpty() )
+    QUrl url = mFile->url();
+
+    if ( cbxPointIsComma->isChecked() )
     {
-      QString field = cmbXField->currentText();
-      url.addQueryItem( "xField", field );
-      field = cmbYField->currentText();
-      url.addQueryItem( "yField", field );
+      url.addQueryItem( "decimalPoint", "," );
     }
-  }
-  else if ( geomTypeWKT->isChecked() )
-  {
-    if ( ! cmbWktField->currentText().isEmpty() )
+    if ( cbxXyDms->isChecked() )
     {
-      QString field = cmbWktField->currentText();
-      url.addQueryItem( "wktField", field );
+      url.addQueryItem( "xyDms", "yes" );
     }
-    if ( cmbGeometryType->currentIndex() > 0 )
+
+    if ( geomTypeXY->isChecked() )
     {
-      url.addQueryItem( "geomType", cmbGeometryType->currentText() );
+      if ( !cmbXField->currentText().isEmpty() && !cmbYField->currentText().isEmpty() )
+      {
+        QString field = cmbXField->currentText();
+        url.addQueryItem( "xField", field );
+        field = cmbYField->currentText();
+        url.addQueryItem( "yField", field );
+      }
     }
-  }
-  else
-  {
-    url.addQueryItem( "geomType", "none" );
-  }
+    else if ( geomTypeWKT->isChecked() )
+    {
+      if ( ! cmbWktField->currentText().isEmpty() )
+      {
+        QString field = cmbWktField->currentText();
+        url.addQueryItem( "wktField", field );
+      }
+      if ( cmbGeometryType->currentIndex() > 0 )
+      {
+        url.addQueryItem( "geomType", cmbGeometryType->currentText() );
+      }
+    }
+    else
+    {
+      url.addQueryItem( "geomType", "none" );
+    }
 
-  if ( ! geomTypeNone->isChecked() ) url.addQueryItem( "spatialIndex", cbxSpatialIndex->isChecked() ? "yes" : "no" );
-  url.addQueryItem( "subsetIndex", cbxSubsetIndex->isChecked() ? "yes" : "no" );
-  url.addQueryItem( "watchFile", cbxWatchFile->isChecked() ? "yes" : "no" );
+    if ( ! geomTypeNone->isChecked() ) url.addQueryItem( "spatialIndex", cbxSpatialIndex->isChecked() ? "yes" : "no" );
+    url.addQueryItem( "subsetIndex", cbxSubsetIndex->isChecked() ? "yes" : "no" );
+    url.addQueryItem( "watchFile", cbxWatchFile->isChecked() ? "yes" : "no" );
 
-  // store the settings
+    // store the settings
+    saveSettingsForFile( txtFilePath->text() );
+
+    // add the layer to the map
+    QString layerName = txtLayerName->text();
+    layerName = layerName.replace(tr("<filename>"),finfo.completeBaseName());
+    emit addVectorLayer( QString::fromAscii( url.toEncoded() ), layerName, "delimitedtext" );
+  }
   saveSettings();
-  saveSettingsForFile( txtFilePath->text() );
-
-
-  // add the layer to the map
-  emit addVectorLayer( QString::fromAscii( url.toEncoded() ), txtLayerName->text(), "delimitedtext" );
-
   accept();
 }
 
@@ -351,7 +362,8 @@ void QgsDelimitedTextSourceSelect::saveSettingsForFile( QString filename )
 
 bool QgsDelimitedTextSourceSelect::loadDelimitedFileDefinition()
 {
-  mFile->setFileName( txtFilePath->text() );
+  QStringList filenames = selectedFileNames();
+  mFile->setFileName( mPreviewFileName );
   mFile->setEncoding( cmbEncoding->currentText() );
   if ( delimiterChars->isChecked() )
   {
@@ -617,39 +629,59 @@ bool QgsDelimitedTextSourceSelect::trySetXYField( QStringList &fields, QList<boo
   return indexY >= 0;
 }
 
-void QgsDelimitedTextSourceSelect::getOpenFileName()
+void QgsDelimitedTextSourceSelect::getOpenFileNames()
 {
   // Get a file to process, starting at the current directory
   // Set inital dir to last used
   QSettings settings;
   QString selectedFilter = settings.value( mPluginKey + "/file_filter", "" ).toString();
 
-  QString s = QFileDialog::getOpenFileName(
-                this,
-                tr( "Choose a delimited text file to open" ),
-                settings.value( mPluginKey + "/text_path", "./" ).toString(),
-                tr( "Text files" ) + " (*.txt *.csv *.dat *.wkt);;"
-                + tr( "All files" ) + " (* *.*)",
-                &selectedFilter
-              );
+  QStringList s = QFileDialog::getOpenFileNames(
+                    this,
+                    tr( "Choose the delimited text files to open" ),
+                    settings.value( mPluginKey + "/text_path", "./" ).toString(),
+                    tr( "Text files" ) + " (*.txt *.csv *.dat *.wkt);;"
+                    + tr( "All files" ) + " (* *.*)",
+                    &selectedFilter
+                  );
   // set path
-  if ( s.isNull() ) return;
+  if ( s.size() == 0 ) return;
   settings.setValue( mPluginKey + "/file_filter", selectedFilter );
-  txtFilePath->setText( s );
+  txtFilePath->setText( s.join( ";" ) );
+}
+
+QStringList QgsDelimitedTextSourceSelect::selectedFileNames()
+{
+  QStringList filenames = txtFilePath->text().split( ";", QString::SkipEmptyParts );
+  return filenames;
 }
 
 void QgsDelimitedTextSourceSelect::updateFileName()
 {
   // put a default layer name in the text entry
-  QString filename = txtFilePath->text();
-  QFileInfo finfo( filename );
-  if ( finfo.exists() )
+  QStringList filenames = selectedFileNames();
+  mPreviewFileName = "";
+  for ( int i = 0; i < filenames.size(); i++ )
   {
-    QSettings settings;
-    settings.setValue( mPluginKey + "/text_path", finfo.path() );
+    QString filename = filenames[i];
+    QFileInfo finfo( filename );
+    if ( finfo.exists() )
+    {
+      mPreviewFileName = filename;
+      QSettings settings;
+      settings.setValue( mPluginKey + "/text_path", finfo.path() );
+      if ( filenames.size() > 1 )
+      {
+        txtLayerName->setText( tr("<filename>") );
+      }
+      else
+      {
+        txtLayerName->setText( finfo.completeBaseName() );
+      }
+      loadSettingsForFile( filename );
+      break;
+    }
   }
-  txtLayerName->setText( finfo.completeBaseName() );
-  loadSettingsForFile( filename );
   updateFieldsAndEnable();
 }
 
@@ -666,11 +698,21 @@ bool QgsDelimitedTextSourceSelect::validate()
   QString message( "" );
   bool enabled = false;
 
-  if ( txtFilePath->text().trimmed().isEmpty() )
+  QStringList filenames = selectedFileNames();
+
+  int nfile = 0;
+  int nbadfile = 0;
+  for ( int i = 0; i < filenames.size(); i++ )
+  {
+    if ( QFileInfo( filenames[i] ).exists() ) nfile++;
+    else nbadfile++;
+  }
+
+  if ( nfile == 0 && nbadfile == 0 )
   {
     message = tr( "Please select an input file" );
   }
-  else if ( ! QFileInfo( txtFilePath->text() ).exists() )
+  else if ( nfile == 0 )
   {
     message = tr( "File %1 does not exist" ).arg( txtFilePath->text() );
   }
@@ -729,12 +771,22 @@ bool QgsDelimitedTextSourceSelect::validate()
   else
   {
     enabled = true;
+    if ( nbadfile > 0 )
+    {
+      message = tr( "%1 selected files do not exist" ).arg(nbadfile);
+    }
     if ( mBadRowCount > 0 )
     {
-      message = tr( "%1 badly formatted records discarded from sample data" ).arg( mBadRowCount );
+      if ( ! message.isEmpty() ) message = message + ". ";
+      message = message + tr( "%1 badly formatted records discarded from sample data" ).arg( mBadRowCount );
     }
 
+    if( message.isEmpty() && ! mPreviewFileName.isEmpty())
+    {
+      message = tr("Sample text from %1").arg(QFileInfo(mPreviewFileName).fileName());
+    }
   }
+
   lblStatus->setText( message );
   return enabled;
 }

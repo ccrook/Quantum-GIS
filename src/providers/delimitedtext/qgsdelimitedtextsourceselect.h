@@ -39,8 +39,9 @@ class QgsDelimitedTextSourceSelect : public QDialog, private Ui::QgsDelimitedTex
   private:
     bool loadDelimitedFileDefinition();
     void updateFieldLists();
-    void getOpenFileName();
+    void getOpenFileNames();
     QString selectedChars();
+    QStringList selectedFileNames();
     void setSelectedChars( QString delimiters );
     void loadSettings( QString subkey = QString(), bool loadGeomSettings = true );
     void saveSettings( QString subkey = QString(), bool saveGeomSettings = true );
@@ -49,6 +50,7 @@ class QgsDelimitedTextSourceSelect : public QDialog, private Ui::QgsDelimitedTex
     bool trySetXYField( QStringList &fields, QList<bool> &isValidNumber, QString xname, QString yname );
 
   private:
+    QString mPreviewFileName;
     QgsDelimitedTextFile *mFile;
     int mExampleRowCount;
     int mBadRowCount;
