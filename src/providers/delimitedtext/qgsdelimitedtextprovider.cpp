@@ -120,6 +120,10 @@ QgsDelimitedTextProvider::QgsDelimitedTextProvider( const QString &uri, const Pr
     }
   }
 
+  mDetectTypes=true;
+  if ( url.hasQueryItem( QStringLiteral( "detectTypes" ) ) )
+    mDetectTypes = ! url.queryItemValue( QStringLiteral( "detectTypes" ) ).toLower().startsWith( 'n' );
+
   if ( url.hasQueryItem( QStringLiteral( "decimalPoint" ) ) )
     mDecimalPoint = url.queryItemValue( QStringLiteral( "decimalPoint" ) );
 
@@ -206,18 +210,18 @@ QStringList QgsDelimitedTextProvider::readCsvtFieldTypes( const QString &filenam
   }
   csvtFile.close();
 
-  // Is the type string valid?
-  // This is a slightly generous regular expression in that it allows spaces and unquoted field types
-  // not allowed in OGR CSVT files.  Also doesn't care if int and string fields have
+  // Split into fields and 
 
-  strTypeList = strTypeList.toLower();
-  QRegExp reTypeList( "^(?:\\s*(\\\"?)(?:integer|real|double|long|longlong|int8|string|date|datetime|time)(?:\\(\\d+(?:\\.\\d+)?\\))?\\1\\s*(?:,|$))+" );
-  if ( ! reTypeList.exactMatch( strTypeList ) )
-  {
-    // Looks like this was supposed to be a CSVT file, so report bad formatted string
-    if ( message ) { *message = tr( "File type string in %1 is not correctly formatted" ).arg( csvtInfo.fileName() ); }
-    return types;
-  }
+  strTypeList = strTypeList.toLower().trimmed();
+  QRegExp reField("^(?:\\\"([^\\\"]*)\\\"|([^\\\"\\,]*))(?:\\,|$)");
+  QRegExp reIntType("^(integer|long|int[124]|integer\\((boolean|int[124])\\))(?:\\(\\d+\\))?$");
+  QRegExp reLongLongType("^(longlong|int8|integer\\(int8\\))(?:\\(\\d+\\))?$");
+  QRegExp reDoubleType("^(float|double|real)(\\(float(32|64))?)?(\\(\\d+(\\.\\d+)?\\))?$");
+  QRegExp reTextType("^("
+          "string|date|datetime|time|"
+          "pointx|pointy|coord(x)|coord(y)|wkt|"
+          "jsonstringlist|jsonintegerlist|jsoninteger64list|jsonrealist"
+          ")(?:\\(\\d+\\))?$" );
 
   // All good, so pull out the types from the string.  Currently only returning integer, real, and string types
 
@@ -225,13 +229,40 @@ QStringList QgsDelimitedTextProvider::readCsvtFieldTypes( const QString &filenam
   QgsDebugMsg( QString( "Field type string: %1" ).arg( strTypeList ) );
 
   int pos = 0;
-  QRegExp reType( "(integer|real|string|date|datetime|time)" );
-
-  while ( ( pos = reType.indexIn( strTypeList, pos ) ) != -1 )
+  while ( pos < strTypeList.size() )
   {
-    QgsDebugMsg( QString( "Found type: %1" ).arg( reType.cap( 1 ) ) );
-    types << reType.cap( 1 );
-    pos += reType.matchedLength();
+    pos = reField.indexIn( strTypeList, pos );
+    if( pos != 0 ) break;
+    QString field=reField.cap( 1 ) + reField.cap(2);
+    QgsDebugMsg( QString( "Found type: %1" ).arg( field ) );
+    if( reIntType.exactMatch( field ) )
+    {
+        types << reType.cap( QStringLiteral( "integer" );
+    }
+    else if( reLongLongType.exactMatch( field ) )
+    {
+        types << reType.cap( QStringLiteral( "longlong" );
+    }
+    else if( reDoubleType.exactMatch( field ) )
+    {
+        types << reType.cap( QStringLiteral( "double" );
+    }
+    else if( reTextType.exactMatch( field ) )
+    {
+        types << reType.cap( QStringLiteral( "text" );
+    }
+    else
+    {
+        break;
+    }
+    pos += reField.matchedLength();
+  }
+  if ( pos < strTypeList.size() )
+  {
+    QgsDebugMsg( QString( "Invalid field at character %1" ).arg( pos ) );
+    // Looks like this was supposed to be a CSVT file, so report bad formatted string
+    if ( message ) { *message = tr( "File type string in %1 is not correctly formatted" ).arg( csvtInfo.fileName() ); }
+    return types;
   }
 
   if ( message )
@@ -240,10 +271,7 @@ QStringList QgsDelimitedTextProvider::readCsvtFieldTypes( const QString &filenam
     // *message=tr("Reading field types from %1").arg(csvtInfo.fileName());
   }
 
-
   return types;
-
-
 }
 
 void QgsDelimitedTextProvider::resetCachedSubset() const
@@ -556,6 +584,11 @@ void QgsDelimitedTextProvider::scanFile( bool buildIndexes )
         couldBeDouble[i] = true;
       }
 
+      if( ! mDetectTypes )
+      {
+          continue;
+      }
+
       // Now test for still valid possible types for the field
       // Types are possible until first record which cannot be parsed
 
@@ -603,39 +636,38 @@ void QgsDelimitedTextProvider::scanFile( bool buildIndexes )
     QString typeName = QStringLiteral( "text" );
     if ( i < csvtTypes.size() )
     {
-      if ( csvtTypes[i] == QLatin1String( "integer" ) )
-      {
-        fieldType = QVariant::Int;
-        typeName = QStringLiteral( "integer" );
-      }
-      else if ( csvtTypes[i] == QLatin1String( "long" ) || csvtTypes[i] == QLatin1String( "longlong" ) || csvtTypes[i] == QLatin1String( "int8" ) )
-      {
-        fieldType = QVariant::LongLong; //QVariant doesn't support long
-        typeName = QStringLiteral( "longlong" );
-      }
-      else if ( csvtTypes[i] == QLatin1String( "real" ) || csvtTypes[i] == QLatin1String( "double" ) )
-      {
-        fieldType = QVariant::Double;
-        typeName = QStringLiteral( "double" );
-      }
+      typeName = csvTypes[i];
     }
     else if ( i < couldBeInt.size() )
     {
       if ( couldBeInt[i] )
       {
-        fieldType = QVariant::Int;
         typeName = QStringLiteral( "integer" );
       }
       else if ( couldBeLongLong[i] )
       {
-        fieldType = QVariant::LongLong;
         typeName = QStringLiteral( "longlong" );
       }
       else if ( couldBeDouble[i] )
       {
-        fieldType = QVariant::Double;
         typeName = QStringLiteral( "double" );
       }
+    }
+    if( typeName == QStringLiteral( "integer" ) )
+    {
+      fieldType = QVariant::Int;
+    }
+    else if ( typeName == QStringLiteral( "longlong" ) )
+    {
+      fieldType = QVariant::LongLong;
+    }
+    else if( typeName == QStringLiteral( "double" ) )
+    {
+      fieldType = QVariant::Double;
+    }
+    else
+    {
+      typeName = QStringLiteral( "text" );
     }
     attributeFields.append( QgsField( fieldNames[i], fieldType, typeName ) );
   }
