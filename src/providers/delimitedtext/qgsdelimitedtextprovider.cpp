@@ -237,19 +237,19 @@ QStringList QgsDelimitedTextProvider::readCsvtFieldTypes( const QString &filenam
     QgsDebugMsg( QString( "Found type: %1" ).arg( field ) );
     if( reIntType.exactMatch( field ) )
     {
-        types << reType.cap( QStringLiteral( "integer" );
+        types << QStringLiteral( "integer" );
     }
     else if( reLongLongType.exactMatch( field ) )
     {
-        types << reType.cap( QStringLiteral( "longlong" );
+        types << QStringLiteral( "longlong" );
     }
     else if( reDoubleType.exactMatch( field ) )
     {
-        types << reType.cap( QStringLiteral( "double" );
+        types << QStringLiteral( "double" );
     }
     else if( reTextType.exactMatch( field ) )
     {
-        types << reType.cap( QStringLiteral( "text" );
+        types << QStringLiteral( "text" );
     }
     else
     {
@@ -636,7 +636,7 @@ void QgsDelimitedTextProvider::scanFile( bool buildIndexes )
     QString typeName = QStringLiteral( "text" );
     if ( i < csvtTypes.size() )
     {
-      typeName = csvTypes[i];
+      typeName = csvtTypes[i];
     }
     else if ( i < couldBeInt.size() )
     {
