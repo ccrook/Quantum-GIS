@@ -261,7 +261,7 @@ QStringList QgsDelimitedTextProvider::readCsvtFieldTypes( const QString &filenam
   {
     QgsDebugMsg( QString( "Invalid field at character %1" ).arg( pos ) );
     // Looks like this was supposed to be a CSVT file, so report bad formatted string
-    if ( message ) { *message = tr( "File type string in %1 is not correctly formatted" ).arg( csvtInfo.fileName() ); }
+    if ( message ) { *message = tr( "File type string %1 in %2 is not correctly formatted" ).arg( strTypeList, csvtInfo.fileName() ); }
     return types;
   }
 
