@@ -216,10 +216,11 @@ QStringList QgsDelimitedTextProvider::readCsvtFieldTypes( const QString &filenam
   QRegExp reField("^(?:\\\"([^\\\"]*)\\\"|([^\\\"\\,]*))(?:\\,|$)");
   QRegExp reIntType("^(integer|long|int[124]|integer\\((boolean|int[124])\\))(?:\\(\\d+\\))?$");
   QRegExp reLongLongType("^(longlong|int8|integer\\(int8\\))(?:\\(\\d+\\))?$");
-  QRegExp reDoubleType("^(float|double|real)(\\(float(32|64))?)?(\\(\\d+(\\.\\d+)?\\))?$");
+  QRegExp reDoubleType("^("
+          "float|double|real|point[xy]|coord\\([xy]\\))"
+          "(\\(float(32|64)\\))?(\\(\\d+(\\.\\d+)?\\))?$");
   QRegExp reTextType("^("
-          "string|date|datetime|time|"
-          "pointx|pointy|coord(x)|coord(y)|wkt|"
+          "string|date|datetime|time|wkt|"
           "jsonstringlist|jsonintegerlist|jsoninteger64list|jsonrealist"
           ")(?:\\(\\d+\\))?$" );
 
@@ -231,8 +232,8 @@ QStringList QgsDelimitedTextProvider::readCsvtFieldTypes( const QString &filenam
   int pos = 0;
   while ( pos < strTypeList.size() )
   {
-    pos = reField.indexIn( strTypeList, pos );
-    if( pos != 0 ) break;
+    int mpos = reField.indexIn( strTypeList, pos, QRegExp::CaretAtOffset );
+    if( mpos !=  pos ) break;
     QString field=reField.cap( 1 ) + reField.cap(2);
     QgsDebugMsg( QString( "Found type: %1" ).arg( field ) );
     if( reIntType.exactMatch( field ) )
